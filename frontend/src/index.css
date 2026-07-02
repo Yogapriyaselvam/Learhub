@@ -1,0 +1,20 @@
+@media print {
+  /* Hides everything else on your site layout during document processing */
+  body * {
+    visibility: hidden;
+  }
+  /* ONLY displays the custom certificate frame cleanly */
+  #printable-certificate-frame, #printable-certificate-frame * {
+    visibility: visible;
+  }
+  #printable-certificate-frame {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: none !important; /* Clean margins */
+  }
+  .no-print, #cert-modal-overlay button {
+    display: none !important;
+  }
+}
