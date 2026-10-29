@@ -8,6 +8,7 @@ import java.util.List;
 public interface CourseRepository extends JpaRepository<Course, Long> {
     
     List<Course> findByInstructorId(Long instructorId);
+    List<Course> findByTitle(String title);
 
     // ✅ FIXED: Join Fetch instructor and category to eagerly fetch data and prevent Hibernate lazy load errors
     @Query("SELECT c FROM Course c LEFT JOIN FETCH c.instructor LEFT JOIN FETCH c.category WHERE c.isPublished = true")

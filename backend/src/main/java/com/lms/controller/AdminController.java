@@ -1,11 +1,15 @@
 package com.lms.controller;
 
 import com.lms.dto.AdminStatsDTO;
+import com.lms.dto.CourseDTO;
 import com.lms.model.Course;
+import com.lms.model.Enrollment;
 import com.lms.model.User;
 import com.lms.repository.CourseRepository;
 import com.lms.repository.EnrollmentRepository;
 import com.lms.repository.UserRepository;
+import com.lms.repository.CertificateRepository;
+import com.lms.service.CourseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,6 +29,8 @@ public class AdminController {
     private final UserRepository userRepo;
     private final CourseRepository courseRepo;
     private final EnrollmentRepository enrollmentRepo;
+    private final CertificateRepository certificateRepo;
+    private final CourseService courseService;
 
     // ==========================
     // USER MANAGEMENT
@@ -66,8 +72,8 @@ public class AdminController {
     // ==========================
 
     @GetMapping("/courses")
-    public ResponseEntity<List<Course>> getAllCourses() {
-        return ResponseEntity.ok(courseRepo.findAll());
+    public ResponseEntity<List<CourseDTO>> getAllCourses() {
+        return ResponseEntity.ok(courseService.getAll());
     }
 
     /**
@@ -148,8 +154,32 @@ public class AdminController {
     // ==========================
 
     @GetMapping("/enrollments")
-    public ResponseEntity<?> getAllEnrollments() {
-        return ResponseEntity.ok(enrollmentRepo.findAll());
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public ResponseEntity<List<Map<String, Object>>> getAllEnrollments() {
+        List<Enrollment> enrollments = enrollmentRepo.findAllWithDetails();
+        List<Map<String, Object>> response = enrollments.stream().map(e -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", e.getId());
+            map.put("enrolledAt", e.getEnrolledAt());
+            map.put("student", e.getStudent() != null ? Map.of(
+                    "id", e.getStudent().getId(),
+                    "name", e.getStudent().getName(),
+                    "email", e.getStudent().getEmail()
+            ) : null);
+            map.put("course", e.getCourse() != null ? Map.of(
+                    "id", e.getCourse().getId(),
+                    "title", e.getCourse().getTitle()
+            ) : null);
+            map.put("status", e.getCompletedAt() != null ? "Completed" : "Active");
+            return map;
+        }).toList();
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/certificates")
+    public ResponseEntity<List<com.lms.model.Certificate>> getAllCertificates() {
+        return ResponseEntity.ok(certificateRepo.findAll());
     }
 
 }

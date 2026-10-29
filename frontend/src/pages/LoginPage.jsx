@@ -182,8 +182,6 @@ export default function LoginPage() {
 
       if (user.role === 'ADMIN') {
         navigate('/admin/dashboard', { replace: true });
-      } else if (user.role === 'INSTRUCTOR') {
-        navigate('/instructor/home', { replace: true });
       } else {
         navigate('/student/home', { replace: true });
       }
@@ -276,45 +274,11 @@ export default function LoginPage() {
             <div style={styles.dividerLine} />
           </div>
 
-          <button
-            type="button"
-            onClick={() => handleSocialLogin('google')}
-            style={styles.socialButtonFull}
-          >
-            <img
-              src="https://unpkg.com/simple-icons@v9/icons/google.svg"
-              alt="Google"
-              style={{ width: 16, height: 16 }}
-            />
-            Continue with Google
-          </button>
+          
+            
 
-          <div style={styles.socialRow}>
-            <button
-              type="button"
-              onClick={() => handleSocialLogin('linkedin')}
-              style={styles.socialButtonHalf}
-            >
-              <img
-                src="https://unpkg.com/simple-icons@v9/icons/linkedin.svg"
-                alt="LinkedIn"
-                style={{ width: 16, height: 16, filter: 'invert(1)' }}
-              />
-              LinkedIn
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSocialLogin('github')}
-              style={styles.socialButtonHalf}
-            >
-              <img
-                src="https://unpkg.com/simple-icons@v9/icons/github.svg"
-                alt="GitHub"
-                style={{ width: 16, height: 16, filter: 'invert(1)' }}
-              />
-              GitHub
-            </button>
-          </div>
+          
+        
         </div>
       </div>
     </div>

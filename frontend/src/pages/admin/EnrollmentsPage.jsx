@@ -1,27 +1,32 @@
 import { useEffect, useState } from 'react';
-
-export const ENROLLMENTS_KEY = 'admin_enrollments';
-
-export function getEnrollments() {
-  const saved = localStorage.getItem(ENROLLMENTS_KEY);
-  if (saved) return JSON.parse(saved);
-
-  const defaults = [
-    { id: 1, studentName: 'Rio Sharma', courseTitle: 'React Masterclass', enrolledOn: '2026-06-28', status: 'Active' },
-    { id: 2, studentName: 'Ananya Iyer', courseTitle: 'Python for Data Science', enrolledOn: '2026-06-20', status: 'Completed' },
-    { id: 3, studentName: 'Karthik Rao', courseTitle: 'AWS Cloud Practitioner', enrolledOn: '2026-06-15', status: 'Active' },
-    { id: 4, studentName: 'Meera Nair', courseTitle: 'UI/UX Design Basics', enrolledOn: '2026-05-30', status: 'Dropped' },
-  ];
-  localStorage.setItem(ENROLLMENTS_KEY, JSON.stringify(defaults));
-  return defaults;
-}
+import API from '../../services/api';
 
 export default function EnrollmentsPage() {
   const [enrollments, setEnrollments] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    setEnrollments(getEnrollments());
+    const loadEnrollments = async () => {
+      try {
+        const res = await API.get('/admin/enrollments');
+        const normalized = (res.data || []).map((item) => ({
+          id: item.id,
+          studentName: item.student?.name || item.studentName || 'Unknown student',
+          courseTitle: item.course?.title || item.courseName || 'Unknown course',
+          enrolledOn: item.enrolledAt || item.createdAt || item.enrollmentDate || '—',
+          status: item.status || 'Active',
+        }));
+        setEnrollments(normalized);
+      } catch (err) {
+        setError('Unable to load enrollments right now.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadEnrollments();
   }, []);
 
   const filtered = statusFilter === 'all' ? enrollments : enrollments.filter((e) => e.status === statusFilter);
@@ -31,6 +36,14 @@ export default function EnrollmentsPage() {
     if (status === 'Completed') return { bg: '#ecfdf5', color: '#059669' };
     return { bg: '#fef2f2', color: '#dc2626' };
   };
+
+  if (loading) {
+    return <div style={{ padding: 20, color: '#64748b' }}>Loading enrollments…</div>;
+  }
+
+  if (error) {
+    return <div style={{ padding: 20, color: '#dc2626' }}>{error}</div>;
+  }
 
   return (
     <div>

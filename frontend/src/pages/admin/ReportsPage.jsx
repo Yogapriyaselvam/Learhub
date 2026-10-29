@@ -1,38 +1,79 @@
 import { useEffect, useState } from 'react';
+import API from '../../services/api';
 
 export default function ReportsPage() {
   const [stats, setStats] = useState({ totalUsers: 0, totalCourses: 0, totalEnrollments: 0, completionRate: 0 });
+  const [certificates, setCertificates] = useState([]);
 
   useEffect(() => {
-    const enrollments = JSON.parse(localStorage.getItem('admin_enrollments') || '[]');
-    const categories = JSON.parse(localStorage.getItem('admin_categories') || '[]');
-    const completed = enrollments.filter((e) => e.status === 'Completed').length;
+    const loadReports = async () => {
+      try {
+        const [statsRes, certsRes] = await Promise.all([
+          API.get('/admin/stats'),
+          API.get('/admin/certificates'),
+        ]);
 
-    setStats({
-      totalUsers: 128,
-      totalCourses: categories.reduce((s, c) => s + (c.courseCount || 0), 0) || 45,
-      totalEnrollments: enrollments.length || 312,
-      completionRate: enrollments.length ? Math.round((completed / enrollments.length) * 100) : 68,
-    });
+        const storedCerts = certsRes?.data || [];
+        const totalEnrollments = statsRes?.data?.totalEnrollments || 0;
+        const totalStudents = statsRes?.data?.totalStudents || 0;
+        const totalCourses = statsRes?.data?.totalCourses || 0;
+        const completionRate = totalEnrollments
+          ? Math.round((storedCerts.length / totalEnrollments) * 100)
+          : 0;
+
+        setStats({
+          totalUsers: totalStudents,
+          totalCourses,
+          totalEnrollments,
+          completionRate,
+        });
+        setCertificates(storedCerts);
+      } catch (err) {
+        console.error('Failed to load reports', err);
+      }
+    };
+
+    loadReports();
   }, []);
 
   return (
     <div>
-      <h1 style={{ marginBottom: 30 }}>Reports & Analytics</h1>
+      <h1 style={{ marginBottom: 30 }}>Certificates</h1>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: 30 }}>
         <StatCard title="Total Users" value={stats.totalUsers} />
         <StatCard title="Total Courses" value={stats.totalCourses} />
         <StatCard title="Total Enrollments" value={stats.totalEnrollments} />
-        <StatCard title="Completion Rate" value={`${stats.completionRate}%`} />
+        <StatCard title="Certificate Rate" value={`${stats.completionRate}%`} />
       </div>
 
       <div style={{ background: '#fff', padding: '20px', borderRadius: 12, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-        <h4 style={{ margin: '0 0 10px' }}>Notes</h4>
-        <p style={{ fontSize: 14, color: '#64748b', lineHeight: 1.7, margin: 0 }}>
-          These figures are pulled from locally stored enrollment and category data as placeholders.
-          Connect this page to your real reporting API endpoint (similar to getDashboardStats) to replace the mock numbers above.
-        </p>
+        <h4 style={{ margin: '0 0 12px' }}>Recipients</h4>
+        {certificates.length === 0 ? (
+          <p style={{ fontSize: 14, color: '#64748b', margin: 0 }}>No certificates have been awarded yet.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {certificates.map((item, index) => {
+              const formatDate = (dateStr) => {
+                if (!dateStr) return '';
+                try {
+                  const d = new Date(dateStr);
+                  if (!isNaN(d.getTime())) {
+                    return d.toLocaleDateString();
+                  }
+                } catch (e) {}
+                return dateStr;
+              };
+              return (
+                <div key={`${item.studentId || item.studentName || item.userId}-${index}`} style={{ border: '1px solid #E2E8F0', borderRadius: 10, padding: '12px 14px' }}>
+                  <div style={{ fontWeight: 700, color: '#0F172A' }}>{item.studentName}</div>
+                  <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>{item.courseTitle}</div>
+                  <div style={{ fontSize: 12, color: '#4F46E5', marginTop: 4 }}>Awarded on {formatDate(item.earnedAt)}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

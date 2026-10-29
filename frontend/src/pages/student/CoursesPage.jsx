@@ -255,11 +255,12 @@ export default function CoursesPage() {
             const fallback = mapDatabaseToCategory(course.category_id || course.categoryid, course.title);
             return {
               ...course,
-              category: course.category || fallback.category,
-              instructor: course.instructor || "Lead Professor",
-              weeks: course.duration_weeks || course.durationweeks || fallback.weeks || 8,
+              category: course.categoryName || course.category || fallback.category,
+              instructor: course.instructorName || course.instructor || "Lead Professor",
+              weeks: course.durationWeeks || course.duration_weeks || course.durationweeks || fallback.weeks || 8,
               desc: course.description || fallback.desc || "",
-              students: course.students || 15,
+              students: course.enrollmentCount || course.students || 15,
+              title: course.title || course.name || "Untitled Course",
             };
           });
 
@@ -286,11 +287,7 @@ export default function CoursesPage() {
 
   const processEnrollment = async (course) => {
     try {
-      try {
-        await enrollCourse(course.id);
-      } catch (err) {
-        console.error("Enrollment error:", err);
-      }
+      await enrollCourse(course.id);
 
       const currentDropped = JSON.parse(localStorage.getItem("dropped_enrollment_ids") || "[]");
       const filteredDropped = currentDropped.filter((id) => Number(id) !== Number(course.id));
@@ -313,7 +310,8 @@ export default function CoursesPage() {
 
       navigate("/student/progress");
     } catch (err) {
-      console.error("Failed to save enrollment locally", err);
+      console.error("Enrollment error:", err);
+      alert("Enrollment could not be saved. Please try again.");
     }
   };
 

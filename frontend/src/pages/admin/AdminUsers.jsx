@@ -20,7 +20,7 @@ export default function AdminUsers() {
             <th style={{ padding: '12px' }}>Name</th>
             <th style={{ padding: '12px' }}>Email</th>
             <th style={{ padding: '12px' }}>Role</th>
-            <th style={{ padding: '12px' }}>Actions</th>
+            
           </tr>
         </thead>
         <tbody>
@@ -30,7 +30,7 @@ export default function AdminUsers() {
               <td style={{ padding: '12px' }}>{user.email}</td>
               <td style={{ padding: '12px' }}>{user.role}</td>
               <td style={{ padding: '12px' }}>
-                <button style={{ background: '#f59e0b', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: 4 }}>Block</button>
+             
               </td>
             </tr>
           ))}

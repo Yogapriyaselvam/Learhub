@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getMyEnrollments, getCourseLessons, dropEnrollment, submitQuiz } from '../../services/api';
+import API, {
+  getMyEnrollments,
+  getCourseLessons,
+  dropEnrollment,
+  submitQuiz,
+  getAllProgress,
+  markLessonComplete,
+  markCourseComplete,
+  submitFeedback as submitFeedbackApi,
+} from '../../services/api';
 
 // ══════════════════════════════════════════════════════
 // COURSE IMAGE MAP — exact image per course title
@@ -174,6 +183,37 @@ export default function ProgressPage() {
 
     const savedFeedbackSubmitted = localStorage.getItem("submitted_feedback_courses");
     if (savedFeedbackSubmitted) setFeedbackSubmittedFor(JSON.parse(savedFeedbackSubmitted));
+
+    const syncProgressFromBackend = async () => {
+      try {
+        const res = await getAllProgress();
+        const backendLessons = {};
+        const backendCourses = {};
+
+        (res?.data || []).forEach((item) => {
+          if (item.courseCompleted) {
+            backendCourses[item.courseId] = true;
+          }
+          (item.completedLessonIds || []).forEach((lessonId) => {
+            backendLessons[lessonId] = true;
+          });
+        });
+
+        if (Object.keys(backendLessons).length > 0) {
+          setCompletedLessons((prev) => ({ ...prev, ...backendLessons }));
+          localStorage.setItem("completed_lessons_map", JSON.stringify({ ...JSON.parse(localStorage.getItem("completed_lessons_map") || "{}"), ...backendLessons }));
+        }
+
+        if (Object.keys(backendCourses).length > 0) {
+          setCourseCompletionStatus((prev) => ({ ...prev, ...backendCourses }));
+          localStorage.setItem("completed_courses_registry", JSON.stringify({ ...JSON.parse(localStorage.getItem("completed_courses_registry") || "{}"), ...backendCourses }));
+        }
+      } catch (err) {
+        console.warn("Could not sync progress from backend", err);
+      }
+    };
+
+    syncProgressFromBackend();
   }, []);
 
   const ProgressBar = ({ percent = 0, height = 8, showLabel = true }) => {
@@ -745,7 +785,12 @@ export default function ProgressPage() {
     setActiveVideoIndex(0);
     setCurrentViewMode('workspace');
     try {
-      await getCourseLessons(course.courseId);
+      try {
+        await getCourseLessons(course.courseId);
+      } catch (err) {
+        // Backend has no lessons endpoint (404) or it failed — that's fine,
+        // we generate the syllabus locally anyway. Just don't let it crash the app.
+      }
       const mockLessons = generateTenSyllabusLessons(course.courseTitle, course.courseId);
       setLessons(mockLessons);
       setActiveLesson(mockLessons[0]);
@@ -755,13 +800,20 @@ export default function ProgressPage() {
     }
   };
 
-  const handleMarkAsComplete = (currentIdx) => {
+  const handleMarkAsComplete = async (currentIdx) => {
     const currentLesson = lessons[currentIdx];
-    setCompletedLessons(prev => {
-      const updated = { ...prev, [currentLesson.id]: true };
-      localStorage.setItem("completed_lessons_map", JSON.stringify(updated));
-      return updated;
-    });
+    const updated = { ...completedLessons, [currentLesson.id]: true };
+    setCompletedLessons(updated);
+    localStorage.setItem("completed_lessons_map", JSON.stringify(updated));
+
+    if (selectedCourse?.courseId) {
+      try {
+        await markLessonComplete(selectedCourse.courseId, currentLesson.id);
+      } catch (err) {
+        console.warn("Could not save lesson progress to backend", err);
+      }
+    }
+
     if (currentIdx < lessons.length - 1) {
       const nextLesson = lessons[currentIdx + 1];
       setActiveLesson(nextLesson);
@@ -789,12 +841,17 @@ export default function ProgressPage() {
     const finalScoreValue = Math.round((correctCount / activeQuizQuestions.length) * 100);
     const passesSyllabusRules = finalScoreValue >= 70;
     try { await submitQuiz({ quizId: 501, answers: selectedAnswers }); } catch (err) {}
-    setScoreReport({ score: finalScoreValue, correctAnswers: correctCount, totalQuestions: activeQuizQuestions.length, status: passesSyllabusRules ? "PASSED" : "FAILED" });
-    if (passesSyllabusRules) {
+    if (passesSyllabusRules && selectedCourse?.courseId) {
+      try {
+        await markCourseComplete(selectedCourse.courseId, finalScoreValue);
+      } catch (err) {
+        console.warn("Could not save course completion to backend", err);
+      }
       const updatedStatus = { ...courseCompletionStatus, [selectedCourse.courseId]: true };
       setCourseCompletionStatus(updatedStatus);
       localStorage.setItem("completed_courses_registry", JSON.stringify(updatedStatus));
     }
+    setScoreReport({ score: finalScoreValue, correctAnswers: correctCount, totalQuestions: activeQuizQuestions.length, status: passesSyllabusRules ? "PASSED" : "FAILED" });
     setSubmittingQuiz(false);
   };
 
@@ -820,7 +877,31 @@ export default function ProgressPage() {
     }
   };
 
-  const triggerCertificateAward = (title) => {
+  const triggerCertificateAward = async (courseId, title) => {
+    const studentName = localStorage.getItem('username') || 'Student';
+    const studentId = localStorage.getItem('userId') || localStorage.getItem('id') || 'anonymous';
+
+    if (courseId) {
+      try {
+        await API.post('/progress/certificate', { courseId });
+      } catch (err) {
+        console.error("Failed to store certificate in backend database", err);
+      }
+    }
+
+    const existing = JSON.parse(localStorage.getItem('earned_certificates') || '[]');
+    const alreadySaved = existing.some((item) => item.courseTitle === title && item.studentId === studentId);
+
+    if (!alreadySaved) {
+      existing.push({
+        studentId,
+        studentName,
+        courseTitle: title,
+        earnedAt: new Date().toLocaleDateString(),
+      });
+      localStorage.setItem('earned_certificates', JSON.stringify(existing));
+    }
+
     setCertCourseTitle(title);
     setShowCertModal(true);
   };
@@ -840,17 +921,32 @@ export default function ProgressPage() {
     setShowFeedbackModal(true);
   };
 
-  const submitFeedback = () => {
+  const submitFeedback = async () => {
     if (!feedbackMessage.trim()) {
       alert("Please write a bit of feedback before submitting.");
       return;
     }
 
-    // Push into the same localStorage key the Admin > Feedback page reads from
+    const storedUser = localStorage.getItem('user');
+    const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+    const feedbackPayload = {
+      studentName: parsedUser?.name || parsedUser?.email || "Student",
+      courseName: feedbackCourseTitle,
+      rating: feedbackRating,
+      comment: feedbackMessage.trim(),
+      status: "pending",
+    };
+
+    try {
+      await submitFeedbackApi(feedbackPayload);
+    } catch (err) {
+      console.warn("Could not save feedback to backend", err);
+    }
+
     const existingFeedback = JSON.parse(localStorage.getItem("admin_feedback") || "[]");
     const newFeedbackEntry = {
       id: Date.now(),
-      studentName: localStorage.getItem('username') || "Student",
+      studentName: feedbackPayload.studentName,
       courseTitle: feedbackCourseTitle,
       rating: feedbackRating,
       message: feedbackMessage.trim(),
@@ -859,8 +955,6 @@ export default function ProgressPage() {
     existingFeedback.push(newFeedbackEntry);
     localStorage.setItem("admin_feedback", JSON.stringify(existingFeedback));
 
-    // Track that feedback was already given for this course so the button
-    // doesn't keep inviting duplicate submissions
     const updatedSubmitted = { ...feedbackSubmittedFor, [feedbackCourseTitle]: true };
     setFeedbackSubmittedFor(updatedSubmitted);
     localStorage.setItem("submitted_feedback_courses", JSON.stringify(updatedSubmitted));
@@ -1269,7 +1363,7 @@ export default function ProgressPage() {
               <span style={{ textTransform: 'uppercase', letterSpacing: '1.5px', background: '#E0E7FF', color: '#4F46E5', fontSize: '11px', fontWeight: 800, padding: '5px 12px', borderRadius: '20px', display: 'inline-block', marginBottom: '8px' }}>Course Graduated</span>
               <h2 style={{ fontSize: 32, fontWeight: 900, color: '#0F172A', margin: '0 0 8px', letterSpacing: '-0.5px' }}>Graduation Passed!</h2>
               <p style={{ color: '#64748B', fontSize: 14, marginBottom: '2rem' }}>You scored {scoreReport.score}% ({scoreReport.correctAnswers}/{scoreReport.totalQuestions} correct).</p>
-              <button onClick={() => { triggerCertificateAward(selectedCourse.courseTitle); setCurrentViewMode('dashboard'); }} style={{ background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', color: '#fff', border: 'none', padding: '12px 28px', borderRadius: 12, fontWeight: 800, cursor: 'pointer' }}>
+              <button onClick={() => { triggerCertificateAward(selectedCourse.courseId, selectedCourse.courseTitle); setCurrentViewMode('dashboard'); }} style={{ background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', color: '#fff', border: 'none', padding: '12px 28px', borderRadius: 12, fontWeight: 800, cursor: 'pointer' }}>
                 🎓 View Certificate
               </button>
             </div>
@@ -1357,7 +1451,7 @@ export default function ProgressPage() {
 
                     {isCourseFinished ? (
                       <>
-                        <button onClick={() => triggerCertificateAward(e.courseTitle)} style={{ width: '100%', background: '#10B981', color: '#fff', border: 'none', padding: '13px', borderRadius: 12, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                        <button onClick={() => triggerCertificateAward(e.courseId, e.courseTitle)} style={{ width: '100%', background: '#10B981', color: '#fff', border: 'none', padding: '13px', borderRadius: 12, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
                           🎓 View & Download PDF Certificate
                         </button>
                         <button

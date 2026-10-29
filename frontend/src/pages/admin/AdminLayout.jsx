@@ -17,11 +17,10 @@ export default function AdminLayout() {
   const adminLinks = [
     { label: "Dashboard", path: "dashboard" },
     { label: "Users", path: "users" },
-    { label: "Courses", path: "courses" },
+  
     { label: "Categories", path: "categories" },
     { label: "Enrollments", path: "enrollments" },
-    { label: "Payments", path: "payments" },
-    { label: "Reports", path: "reports" },
+    { label: "Certificates", path: "reports" },
     { label: "Feedback", path: "feedback" },
     { label: "Settings", path: "settings" },
   ];

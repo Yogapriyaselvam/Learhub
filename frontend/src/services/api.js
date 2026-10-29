@@ -4,7 +4,10 @@ import axios from "axios";
 // Axios Configuration
 // ==========================================
 const API = axios.create({
-  baseURL: "http://localhost:8082/api",
+  baseURL: "http://localhost:8082/api", // Change to 8082 only if your backend runs there
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
 // ==========================================
@@ -41,6 +44,7 @@ API.interceptors.response.use(
 // ==========================================
 // AUTH
 // ==========================================
+
 export const register = (data) =>
   API.post("/auth/register", data);
 
@@ -48,7 +52,11 @@ export const login = (data) =>
   API.post("/auth/login", data);
 
 export const resetPassword = (data) =>
-   axios.post('http://localhost:8082/api/auth/reset-password', data);
+  API.post("/auth/reset-password", data);
+
+// ==========================================
+// COURSES
+// ==========================================
 
 export const getPublicCourses = () =>
   API.get("/courses/public");
@@ -56,14 +64,22 @@ export const getPublicCourses = () =>
 export const getCourseById = (id) =>
   API.get(`/courses/public/${id}`);
 
+export const getCourseLessons = (courseId) =>
+  API.get(`/courses/${courseId}/lessons`);
+
 // ==========================================
 // STUDENT
 // ==========================================
-export const enrollCourse = (id) =>
-  API.post(`/student/enroll/${id}`);
+
+export const enrollCourse = (courseId) =>
+  API.post(`/student/enroll/${courseId}`);
 
 export const getMyEnrollments = () =>
   API.get("/student/enrollments");
+
+// ✅ Correct endpoint
+export const dropEnrollment = (courseId) =>
+  API.delete(`/student/enroll/${courseId}`);
 
 export const submitQuiz = (data) =>
   API.post("/student/quiz/submit", data);
@@ -71,15 +87,45 @@ export const submitQuiz = (data) =>
 export const getQuizAttempts = () =>
   API.get("/student/quiz/attempts");
 
-export const getCourseLessons = (courseId) =>
-  API.get(`/student/courses/${courseId}/lessons`);
+// ==========================================
+// FEEDBACK
+// ==========================================
 
-export const dropEnrollment = (enrollmentId) =>
-  API.delete(`/student/enrollments/${enrollmentId}`);
+export const submitFeedback = (data) =>
+  API.post("/feedback", data);
+
+export const getFeedbacks = () =>
+  API.get("/feedback");
+
+export const deleteFeedback = (id) =>
+  API.delete(`/feedback/${id}`);
+
+// ==========================================
+// PROGRESS
+// ==========================================
+
+export const getAllProgress = () =>
+  API.get("/progress/all");
+
+export const getCourseProgress = (courseId) =>
+  API.get(`/progress/course/${courseId}`);
+
+export const markLessonComplete = (courseId, lessonId) =>
+  API.post("/progress/lesson/complete", {
+    courseId,
+    lessonId,
+  });
+
+export const markCourseComplete = (courseId, score) =>
+  API.post("/progress/course/complete", {
+    courseId,
+    score,
+  });
 
 // ==========================================
 // INSTRUCTOR
 // ==========================================
+
 export const getMyCourses = () =>
   API.get("/instructor/courses");
 
@@ -95,6 +141,7 @@ export const getCourseStudents = (id) =>
 // ==========================================
 // ADMIN
 // ==========================================
+
 export const getAllUsers = () =>
   API.get("/admin/users");
 
@@ -111,12 +158,11 @@ export const getAdminStats = () =>
   API.get("/admin/stats");
 
 // ==========================================
-// BACKWARD COMPATIBILITY
+// Backward Compatibility
 // ==========================================
-export const getAllCourses = getPublicCourses;
 
+export const getAllCourses = getPublicCourses;
 export const enrollInCourse = enrollCourse;
 
-// ==========================================
 
 export default API;

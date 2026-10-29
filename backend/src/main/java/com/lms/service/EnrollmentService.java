@@ -32,12 +32,20 @@ public class EnrollmentService {
         Course course = courseRepo.findById(courseId)
                 .orElseThrow(() -> new RuntimeException("Course not found"));
 
-        // ✅ SAFE WAY (NO builder)
         Enrollment enrollment = new Enrollment();
         enrollment.setStudent(student);
         enrollment.setCourse(course);
 
         return enrollmentRepo.save(enrollment);
+    }
+
+    // Drop course
+    public void drop(Long studentId, Long courseId) {
+
+        Enrollment enrollment = enrollmentRepo.findByStudentIdAndCourseId(studentId, courseId)
+                .orElseThrow(() -> new RuntimeException("Enrollment not found"));
+
+        enrollmentRepo.delete(enrollment);
     }
 
     // Get all courses of a student

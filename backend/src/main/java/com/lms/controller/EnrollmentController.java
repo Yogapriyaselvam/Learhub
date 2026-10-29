@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.*;
 
 @RestController
@@ -25,25 +26,39 @@ public class EnrollmentController {
     public ResponseEntity<Map<String, String>> enroll(
             @PathVariable Long courseId,
             @AuthenticationPrincipal UserDetailsImpl user) {
+
         enrollmentService.enroll(user.getId(), courseId);
         return ResponseEntity.ok(Map.of("message", "Enrolled successfully"));
     }
 
-    /** Get my enrollments — ✅ Maps to clear flat layout without needing a separate DTO class file */
+    /** Drop a course */
+    @DeleteMapping("/enroll/{courseId}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<Map<String, String>> dropCourse(
+            @PathVariable Long courseId,
+            @AuthenticationPrincipal UserDetailsImpl user) {
+
+        enrollmentService.drop(user.getId(), courseId);
+        return ResponseEntity.ok(Map.of("message", "Dropped successfully"));
+    }
+
+    /** Get my enrollments */
     @GetMapping("/enrollments")
     @PreAuthorize("hasRole('STUDENT')")
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ResponseEntity<List<Map<String, Object>>> getMyEnrollments(
             @AuthenticationPrincipal UserDetailsImpl user) {
-        
+
         List<Enrollment> enrollments = enrollmentService.getStudentEnrollments(user.getId());
-        
+
         List<Map<String, Object>> responseList = enrollments.stream().map(e -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", e.getId());
             map.put("enrolledAt", e.getEnrolledAt());
-            // Flatten the course property to avoid infinite serialization loops
+            map.put("studentId", e.getStudent() != null ? e.getStudent().getId() : null);
             map.put("courseId", e.getCourse() != null ? e.getCourse().getId() : null);
             map.put("courseTitle", e.getCourse() != null ? e.getCourse().getTitle() : null);
+
             return map;
         }).toList();
 
@@ -56,6 +71,7 @@ public class EnrollmentController {
     public ResponseEntity<Map<String, Object>> submitQuiz(
             @RequestBody QuizSubmitRequest req,
             @AuthenticationPrincipal UserDetailsImpl user) {
+
         return ResponseEntity.ok(quizService.submitQuiz(user.getId(), req));
     }
 
@@ -64,6 +80,7 @@ public class EnrollmentController {
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<List<QuizAttempt>> getAttempts(
             @AuthenticationPrincipal UserDetailsImpl user) {
+
         return ResponseEntity.ok(quizService.getStudentAttempts(user.getId()));
     }
 }

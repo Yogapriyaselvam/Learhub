@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getMyEnrollments } from '../../services/api';
+import { getMyEnrollments, getQuizAttempts, getAllProgress } from '../../services/api';
 
 // ─── Keyframe injection (runs once) ────────────────────────────────────────
 const injectKeyframes = () => {
@@ -49,7 +49,7 @@ const injectKeyframes = () => {
 };
 
 // ─── Stat card meta ────────────────────────────────────────────────────────
-const CARDS = (enrollCount) => [
+const CARDS = (enrollCount, quizCount) => [
   {
     label: 'Active courses',
     value: enrollCount,
@@ -60,7 +60,7 @@ const CARDS = (enrollCount) => [
   },
   {
     label: 'Quizzes completed',
-    value: 2,
+    value: quizCount,
     icon: '🎯',
     accent: '#0891B2',
     bg: '#ECFEFF',
@@ -79,13 +79,54 @@ const CARDS = (enrollCount) => [
 
 export default function StudentHome() {
   const [enrollCount, setEnrollCount] = useState(0);
+  const [quizCount, setQuizCount] = useState(0);
   const username = localStorage.getItem('username') || 'Student';
 
   useEffect(() => {
     injectKeyframes();
-    getMyEnrollments()
-      .then(res => { if (res && res.data) setEnrollCount(res.data.length); })
-      .catch(err => console.error(err));
+
+    const loadDashboardStats = async () => {
+      try {
+        const [enrollRes, quizRes, progressRes] = await Promise.all([
+          getMyEnrollments(),
+          getQuizAttempts(),
+          getAllProgress().catch(() => ({ data: [] })),
+        ]);
+
+        const myEnrollments = Array.isArray(enrollRes?.data) ? enrollRes.data : [];
+        const currentUserId = localStorage.getItem('userId') || localStorage.getItem('id') || '';
+        
+        const studentEnrollments = currentUserId
+          ? myEnrollments.filter((item) => String(item.studentId || item.userId || item.user_id || '') === String(currentUserId))
+          : myEnrollments;
+
+        const completedCourseIds = new Set();
+        if (progressRes && Array.isArray(progressRes.data)) {
+          progressRes.data.forEach((p) => {
+            if (p.courseCompleted || p.completed) {
+              completedCourseIds.add(Number(p.courseId));
+            }
+          });
+        }
+
+        const droppedMap = JSON.parse(localStorage.getItem("dropped_enrollment_ids") || "[]").map(Number);
+
+        const activeCourses = studentEnrollments.filter((item) => {
+          const cid = Number(item.courseId || item.id);
+          return !droppedMap.includes(cid) && !completedCourseIds.has(cid);
+        });
+
+        setEnrollCount(activeCourses.length);
+
+        if (quizRes?.data) {
+          setQuizCount(quizRes.data.length);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    loadDashboardStats();
   }, []);
 
   return (
@@ -158,7 +199,7 @@ export default function StudentHome() {
         gap: '1.25rem',
         marginBottom: '2rem',
       }}>
-        {CARDS(enrollCount).map((card) => (
+        {CARDS(enrollCount, quizCount).map((card) => (
           <div
             key={card.label}
             className="sh-card-hover"

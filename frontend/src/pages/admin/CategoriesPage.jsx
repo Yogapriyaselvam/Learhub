@@ -43,12 +43,7 @@ export default function CategoriesPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 }}>
         <h1 style={{ margin: 0 }}>Category Management</h1>
-        <button
-          onClick={() => setShowAddModal(true)}
-          style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}
-        >
-          + Add New Category
-        </button>
+        
       </div>
 
       {categories.length === 0 ? (

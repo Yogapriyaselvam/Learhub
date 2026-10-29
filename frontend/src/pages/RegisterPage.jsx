@@ -159,7 +159,7 @@ export default function RegisterPage() {
               onChange={(e) => setForm({ ...form, role: e.target.value })}
             >
               <option value="STUDENT">Student</option>
-              <option value="INSTRUCTOR">Instructor</option>
+            
             </select>
 
             <button type="submit" disabled={loading} style={styles.button}>
